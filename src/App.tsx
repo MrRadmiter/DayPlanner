@@ -62,7 +62,11 @@ function downloadFile(name: string, content: string, type: string) {
 
 export default function App() {
   const [entries, setEntries] = useState<Entry[]>(loadEntries);
-  const [activeView, setActiveView] = useState<"Today" | "Week">("Today");
+  const [activeView, setActiveView] = useState<"Day" | "Week" | "Month" | "All">("Day");
+  const [selectedDate, setSelectedDate] = useState(() => getTodayString());
+  const [selectedWeekOffset, setSelectedWeekOffset] = useState(0);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+
   const [category, setCategory] = useState<(typeof categories)[number]>("All");
   const [query, setQuery] = useState("");
   const [editorOpen, setEditorOpen] = useState(false);
@@ -80,25 +84,32 @@ export default function App() {
     localStorage.setItem("daymark.theme", dark ? "dark" : "light");
   }, [dark]);
 
-  const todayEntries = useMemo(
-    () => entries.filter((entry) => entry.date === todayStr),
-                               [entries, todayStr]
+  const selectedDayEntries = useMemo(
+    () => entries.filter((entry) => entry.date === selectedDate),
+                                     [entries, selectedDate]
   );
 
   const filtered = useMemo(
     () =>
-    todayEntries
+    (activeView === "All" ? entries : selectedDayEntries)
     .filter((entry) => category === "All" || entry.category === category)
     .filter((entry) => entry.title.toLowerCase().includes(query.toLowerCase()))
-    .sort((a, b) => a.start.localeCompare(b.start)),
-                           [todayEntries, category, query]
+    .sort((a, b) => a.date.localeCompare(b.date) || a.start.localeCompare(b.start)),
+                           [activeView, entries, selectedDayEntries, category, query]
   );
 
-  const completed = todayEntries.filter((entry) => entry.done).length;
-  const percent = todayEntries.length ? Math.round((completed / todayEntries.length) * 100) : 0;
+  const completed = selectedDayEntries.filter((entry) => entry.done).length;
+  const percent = selectedDayEntries.length ? Math.round((completed / selectedDayEntries.length) * 100) : 0;
 
-  const openNew = () => {
+  const changeDayOffset = (offset: number) => {
+    const d = new Date(`${selectedDate}T00:00:00`);
+    d.setDate(d.getDate() + offset);
+    setSelectedDate(getTodayString(d));
+  };
+
+  const openNew = (defaultDate = selectedDate) => {
     setEditing(null);
+    setSelectedDate(defaultDate);
     setEditorOpen(true);
   };
 
@@ -134,11 +145,11 @@ export default function App() {
 
     <nav className="nav-stack" aria-label="Main navigation">
     <Button
-    variant={activeView === "Today" ? "nav-active" : "nav"}
-    onClick={() => setActiveView("Today")}
+    variant={activeView === "Day" ? "nav-active" : "nav"}
+    onClick={() => setActiveView("Day")}
     icon="sun"
     >
-    Today
+    Day
     </Button>
     <Button
     variant={activeView === "Week" ? "nav-active" : "nav"}
@@ -146,6 +157,20 @@ export default function App() {
     icon="calendar"
     >
     Week
+    </Button>
+    <Button
+    variant={activeView === "Month" ? "nav-active" : "nav"}
+    onClick={() => setActiveView("Month")}
+    icon="calendar"
+    >
+    Calendar
+    </Button>
+    <Button
+    variant={activeView === "All" ? "nav-active" : "nav"}
+    onClick={() => setActiveView("All")}
+    icon="search"
+    >
+    All Tasks
     </Button>
     </nav>
 
@@ -172,31 +197,44 @@ export default function App() {
     <Button variant="icon" label="Toggle theme" onClick={() => setDark((value) => !value)} icon="moon" />
     </header>
 
-    {activeView === "Today" ? (
+    {activeView === "Day" || activeView === "All" ? (
       <>
       <section className="page-heading">
       <div>
-      <div className="eyebrow">TODAY</div>
-      <div className="page-title">{formatFullDate(todayStr)}</div>
-      <div className="page-subtitle">Daily task schedule and overview.</div>
+      <div className="eyebrow">{activeView === "All" ? "ALL TASKS" : selectedDate === todayStr ? "TODAY" : "SELECTED DATE"}</div>
+      <div className="page-title">{activeView === "All" ? "All Entries Overview" : formatFullDate(selectedDate)}</div>
+      <div className="page-subtitle">
+      {activeView === "All" ? `Total entries: ${entries.length}` : "Daily schedule and progress."}
       </div>
-      <Button variant="primary" onClick={openNew} icon="plus">New entry</Button>
+      </div>
+      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+      {activeView === "Day" && (
+        <>
+        <Button variant="secondary" onClick={() => changeDayOffset(-1)}>← Prev</Button>
+        <Button variant="secondary" onClick={() => setSelectedDate(todayStr)}>Today</Button>
+        <Button variant="secondary" onClick={() => changeDayOffset(1)}>Next →</Button>
+        </>
+      )}
+      <Button variant="primary" onClick={() => openNew(selectedDate)} icon="plus">New entry</Button>
+      </div>
       </section>
 
-      <section className="progress-card">
-      <div className="progress-top">
-      <div>
-      <div className="card-label">DAILY PROGRESS</div>
-      <div className="progress-copy">
-      <strong>{completed}</strong> of {todayEntries.length} entries complete
-      </div>
-      </div>
-      <div className="progress-percent">{percent}%</div>
-      </div>
-      <div className="progress-track">
-      <div className="progress-fill" style={{ width: `${percent}%` }} />
-      </div>
-      </section>
+      {activeView === "Day" && (
+        <section className="progress-card">
+        <div className="progress-top">
+        <div>
+        <div className="card-label">DAILY PROGRESS</div>
+        <div className="progress-copy">
+        <strong>{completed}</strong> of {selectedDayEntries.length} entries complete
+        </div>
+        </div>
+        <div className="progress-percent">{percent}%</div>
+        </div>
+        <div className="progress-track">
+        <div className="progress-fill" style={{ width: `${percent}%` }} />
+        </div>
+        </section>
+      )}
 
       <section className="toolbar">
       <Field
@@ -227,6 +265,7 @@ export default function App() {
           <div className="entry-time">
           <span>{entry.start}</span>
           {entry.end && <small>{entry.end}</small>}
+          {activeView === "All" && <small style={{ fontWeight: "bold" }}>{entry.date}</small>}
           </div>
           <Button
           variant={entry.done ? "check-active" : "check"}
@@ -264,21 +303,37 @@ export default function App() {
       )}
       </section>
       </>
+    ) : activeView === "Week" ? (
+      <WeekView
+      entries={entries}
+      weekOffset={selectedWeekOffset}
+      onWeekOffsetChange={setSelectedWeekOffset}
+      onSelectDate={(date) => { setSelectedDate(date); setActiveView("Day"); }}
+      onExportJson={exportJson}
+      onExportIcs={exportIcs}
+      />
     ) : (
-      <WeekView entries={entries} onExportJson={exportJson} onExportIcs={exportIcs} />
+      <MonthCalendarView
+      entries={entries}
+      monthDate={calendarMonth}
+      onMonthChange={setCalendarMonth}
+      onSelectDate={(date) => { setSelectedDate(date); setActiveView("Day"); }}
+      onNewTask={(date) => openNew(date)}
+      />
     )}
     </main>
 
     <nav className="mobile-nav" aria-label="Mobile navigation">
-    <Button variant={activeView === "Today" ? "mobile-active" : "mobile"} icon="sun" onClick={() => setActiveView("Today")}>Today</Button>
-    <Button variant="mobile-create" label="New entry" icon="plus" onClick={openNew} />
+    <Button variant={activeView === "Day" ? "mobile-active" : "mobile"} icon="sun" onClick={() => setActiveView("Day")}>Day</Button>
     <Button variant={activeView === "Week" ? "mobile-active" : "mobile"} icon="calendar" onClick={() => setActiveView("Week")}>Week</Button>
+    <Button variant="mobile-create" label="New entry" icon="plus" onClick={() => openNew(selectedDate)} />
+    <Button variant={activeView === "Month" ? "mobile-active" : "mobile"} icon="calendar" onClick={() => setActiveView("Month")}>Calendar</Button>
     </nav>
 
     {editorOpen && (
       <EntryEditor
       entry={editing}
-      todayStr={todayStr}
+      defaultDate={selectedDate}
       onClose={() => setEditorOpen(false)}
       onSave={saveEntry}
       onDelete={
@@ -297,19 +352,31 @@ export default function App() {
 
 function WeekView({
   entries,
+  weekOffset,
+  onWeekOffsetChange,
+  onSelectDate,
   onExportJson,
   onExportIcs,
 }: {
   entries: Entry[];
+  weekOffset: number;
+  onWeekOffsetChange: (offset: number) => void;
+  onSelectDate: (dateStr: string) => void;
   onExportJson: () => void;
   onExportIcs: () => void;
 }) {
-  const today = useMemo(() => new Date(), []);
-  const monday = useMemo(() => getStartOfWeek(today), [today]);
+  const baseDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + weekOffset * 7);
+    return d;
+  }, [weekOffset]);
+
+  const monday = useMemo(() => getStartOfWeek(baseDate), [baseDate]);
 
   const weekDays = useMemo(() => {
     const days = [];
     const names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const todayStr = getTodayString();
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
@@ -321,16 +388,15 @@ function WeekView({
                 fullDateStr: dateStr,
                 total: dayEntries.length,
                 completed: dayEntries.filter((e) => e.done).length,
-                isToday: dateStr === getTodayString(today),
+                isToday: dateStr === todayStr,
       });
     }
     return days;
-  }, [entries, monday, today]);
+  }, [entries, monday]);
 
   const totalWeekly = useMemo(() => weekDays.reduce((acc, d) => acc + d.total, 0), [weekDays]);
   const completedWeekly = useMemo(() => weekDays.reduce((acc, d) => acc + d.completed, 0), [weekDays]);
   const weeklyPercent = totalWeekly ? Math.round((completedWeekly / totalWeekly) * 100) : 0;
-
   const maxDailyTasks = useMemo(() => Math.max(...weekDays.map((d) => d.total), 1), [weekDays]);
 
   const sunday = useMemo(() => {
@@ -339,7 +405,7 @@ function WeekView({
     return d;
   }, [monday]);
 
-  const rangeLabel = `${monday.getDate()}–${sunday.getDate()} ${sunday.toLocaleDateString("en-US", { month: "short" })}`;
+  const rangeLabel = `${monday.getDate()} ${monday.toLocaleDateString("en-US", { month: "short" })} – ${sunday.getDate()} ${sunday.toLocaleDateString("en-US", { month: "short" })} ${sunday.getFullYear()}`;
 
   return (
     <>
@@ -347,11 +413,14 @@ function WeekView({
     <div>
     <div className="eyebrow">WEEKLY OVERVIEW</div>
     <div className="page-title">{rangeLabel}</div>
-    <div className="page-subtitle">Summary of tasks for the current week.</div>
+    <div className="page-subtitle">Tasks scheduled for this week.</div>
     </div>
-    <div className="export-actions">
-    <Button variant="secondary" icon="download" onClick={onExportJson}>Export JSON</Button>
-    <Button variant="primary" icon="calendar" onClick={onExportIcs}>Export .ics</Button>
+    <div className="export-actions" style={{ display: "flex", gap: "8px" }}>
+    <Button variant="secondary" onClick={() => onWeekOffsetChange(weekOffset - 1)}>← Prev Week</Button>
+    <Button variant="secondary" onClick={() => onWeekOffsetChange(0)}>This Week</Button>
+    <Button variant="secondary" onClick={() => onWeekOffsetChange(weekOffset + 1)}>Next Week →</Button>
+    <Button variant="secondary" icon="download" onClick={onExportJson}>JSON</Button>
+    <Button variant="primary" icon="calendar" onClick={onExportIcs}>.ics</Button>
     </div>
     </section>
 
@@ -369,7 +438,12 @@ function WeekView({
     </div>
     <div className="week-bars">
     {weekDays.map((day) => (
-      <div className="day-column" key={day.name}>
+      <div
+      className="day-column"
+      key={day.fullDateStr}
+      style={{ cursor: "pointer" }}
+      onClick={() => onSelectDate(day.fullDateStr)}
+      >
       <div className="bar-track">
       <div
       className="bar-fill"
@@ -382,13 +456,124 @@ function WeekView({
     ))}
     </div>
     </section>
+    </>
+  );
+}
 
-    <section className="week-notice">
-    <Icon name="shield" />
+function MonthCalendarView({
+  entries,
+  monthDate,
+  onMonthChange,
+  onSelectDate,
+  onNewTask,
+}: {
+  entries: Entry[];
+  monthDate: Date;
+  onMonthChange: (d: Date) => void;
+  onSelectDate: (dateStr: string) => void;
+  onNewTask: (dateStr: string) => void;
+}) {
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+
+  const firstDayOfMonth = new Date(year, month, 1);
+  const lastDayOfMonth = new Date(year, month + 1, 0);
+
+  const startingDayOfWeek = (firstDayOfMonth.getDay() + 6) % 7; // Monday = 0
+  const daysInMonth = lastDayOfMonth.getDate();
+
+  const todayStr = getTodayString();
+
+  const monthLabel = monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  const changeMonth = (offset: number) => {
+    onMonthChange(new Date(year, month + offset, 1));
+  };
+
+  const calendarGrid = useMemo(() => {
+    const grid = [];
+    // Blank days before start
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      grid.push(null);
+    }
+    // Days of month
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateObj = new Date(year, month, d);
+      const dateStr = getTodayString(dateObj);
+      const dayTasks = entries.filter((e) => e.date === dateStr);
+      grid.push({
+        dayNum: d,
+        dateStr,
+        tasks: dayTasks,
+        isToday: dateStr === todayStr,
+      });
+    }
+    return grid;
+  }, [year, month, startingDayOfWeek, daysInMonth, entries, todayStr]);
+
+  return (
+    <>
+    <section className="page-heading">
     <div>
-    <div className="privacy-title">Local Data Control</div>
-    <div className="privacy-copy">Data resides locally in the browser storage.</div>
+    <div className="eyebrow">MONTHLY CALENDAR</div>
+    <div className="page-title">{monthLabel}</div>
+    <div className="page-subtitle">Navigate through months to inspect planned activities.</div>
     </div>
+    <div style={{ display: "flex", gap: "8px" }}>
+    <Button variant="secondary" onClick={() => changeMonth(-1)}>← Prev Month</Button>
+    <Button variant="secondary" onClick={() => onMonthChange(new Date())}>Current Month</Button>
+    <Button variant="secondary" onClick={() => changeMonth(1)}>Next Month →</Button>
+    </div>
+    </section>
+
+    <section style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "8px", marginTop: "16px" }}>
+    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((dayName) => (
+      <div key={dayName} style={{ fontWeight: "bold", textAlign: "center", padding: "8px", opacity: 0.7 }}>
+      {dayName}
+      </div>
+    ))}
+
+    {calendarGrid.map((cell, index) =>
+      cell ? (
+        <div
+        key={cell.dateStr}
+        style={{
+          border: "1px solid var(--border-color, #334155)",
+              borderRadius: "8px",
+              padding: "8px",
+              minHeight: "85px",
+              backgroundColor: cell.isToday ? "rgba(59, 130, 246, 0.1)" : "transparent",
+              cursor: "pointer",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+        }}
+        onClick={() => onSelectDate(cell.dateStr)}
+        >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <strong style={{ color: cell.isToday ? "#3b82f6" : "inherit" }}>{cell.dayNum}</strong>
+        <Button
+        variant="icon"
+        icon="plus"
+        label="Add task"
+        onClick={(e) => {
+          e.stopPropagation();
+          onNewTask(cell.dateStr);
+        }}
+        />
+        </div>
+        <div>
+        {cell.tasks.length > 0 && (
+          <div style={{ fontSize: "11px", marginTop: "4px" }}>
+          <span style={{ fontWeight: "bold", color: "#3b82f6" }}>{cell.tasks.length} task(s)</span>
+          </div>
+        )}
+        </div>
+        </div>
+      ) : (
+        <div key={`empty-${index}`} style={{ padding: "8px" }} />
+      )
+    )}
     </section>
     </>
   );
@@ -396,13 +581,13 @@ function WeekView({
 
 function EntryEditor({
   entry,
-  todayStr,
+  defaultDate,
   onClose,
   onSave,
   onDelete,
 }: {
   entry: Entry | null;
-  todayStr: string;
+  defaultDate: string;
   onClose: () => void;
   onSave: (entry: Entry) => void;
   onDelete?: () => void;
@@ -411,7 +596,7 @@ function EntryEditor({
     entry ?? {
       id: Date.now(),
                                           title: "",
-                                          date: todayStr,
+                                          date: defaultDate,
                                           start: "09:00",
                                           end: "10:00",
                                           category: "Study",
