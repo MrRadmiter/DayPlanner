@@ -304,3 +304,38 @@ textarea { min-height: 88px; resize: vertical; }
     width: 100%;
   }
 }
+
+
+/* ИСПРАВЛЕНИЯ ШАПКИ И НИЖНЕЙ НАВИГАЦИИ */
+
+.page-heading {
+  flex-wrap: wrap !important;
+  gap: 16px !important;
+}
+
+@media (max-width: 680px) {
+  .mobile-nav {
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 2px !important;
+    padding: 6px 4px !important;
+    position: fixed !important;
+    inset: auto 8px calc(8px + env(safe-area-inset-bottom, 0px)) 8px !important;
+    z-index: 99 !important;
+  }
+
+  .button-mobile-create {
+    transform: none !important;
+    width: 100% !important;
+    height: 38px !important;
+    border-radius: 8px !important;
+    margin: 0 !important;
+  }
+
+  .button-mobile,
+  .button-mobile-active {
+    width: 100% !important;
+    padding: 4px 0 !important;
+    font-size: 9px !important;
+  }
+}

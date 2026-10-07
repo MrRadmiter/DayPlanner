@@ -144,34 +144,10 @@ export default function App() {
     </div>
 
     <nav className="nav-stack" aria-label="Main navigation">
-    <Button
-    variant={activeView === "Day" ? "nav-active" : "nav"}
-    onClick={() => setActiveView("Day")}
-    icon="sun"
-    >
-    Day
-    </Button>
-    <Button
-    variant={activeView === "Week" ? "nav-active" : "nav"}
-    onClick={() => setActiveView("Week")}
-    icon="calendar"
-    >
-    Week
-    </Button>
-    <Button
-    variant={activeView === "Month" ? "nav-active" : "nav"}
-    onClick={() => setActiveView("Month")}
-    icon="calendar"
-    >
-    Calendar
-    </Button>
-    <Button
-    variant={activeView === "All" ? "nav-active" : "nav"}
-    onClick={() => setActiveView("All")}
-    icon="search"
-    >
-    All Tasks
-    </Button>
+    <Button variant={activeView === "Day" ? "nav-active" : "nav"} onClick={() => setActiveView("Day")} icon="sun">Day</Button>
+    <Button variant={activeView === "Week" ? "nav-active" : "nav"} onClick={() => setActiveView("Week")} icon="calendar">Week</Button>
+    <Button variant={activeView === "Month" ? "nav-active" : "nav"} onClick={() => setActiveView("Month")} icon="calendar">Calendar</Button>
+    <Button variant={activeView === "All" ? "nav-active" : "nav"} onClick={() => setActiveView("All")} icon="search">All Tasks</Button>
     </nav>
 
     <div className="sidebar-bottom">
@@ -194,7 +170,7 @@ export default function App() {
     <div className="brand-mark"><Icon name="check" /></div>
     <div className="brand-name">daymark</div>
     </div>
-    <Button variant="icon" label="Toggle theme" onClick={() => setDark((value) => !value)} icon="moon" />
+    <Button variant="icon" label="Toggle theme" onClick={() => setDark((value) => !value)} icon={dark ? "sun" : "moon"} />
     </header>
 
     {activeView === "Day" || activeView === "All" ? (
@@ -207,7 +183,7 @@ export default function App() {
       {activeView === "All" ? `Total entries: ${entries.length}` : "Daily schedule and progress."}
       </div>
       </div>
-      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
       {activeView === "Day" && (
         <>
         <Button variant="secondary" onClick={() => changeDayOffset(-1)}>← Prev</Button>
@@ -323,11 +299,13 @@ export default function App() {
     )}
     </main>
 
+    {/* Выравненный порядок элементов нижней навигации */}
     <nav className="mobile-nav" aria-label="Mobile navigation">
     <Button variant={activeView === "Day" ? "mobile-active" : "mobile"} icon="sun" onClick={() => setActiveView("Day")}>Day</Button>
     <Button variant={activeView === "Week" ? "mobile-active" : "mobile"} icon="calendar" onClick={() => setActiveView("Week")}>Week</Button>
-    <Button variant="mobile-create" label="New entry" icon="plus" onClick={() => openNew(selectedDate)} />
     <Button variant={activeView === "Month" ? "mobile-active" : "mobile"} icon="calendar" onClick={() => setActiveView("Month")}>Calendar</Button>
+    <Button variant={activeView === "All" ? "mobile-active" : "mobile"} icon="search" onClick={() => setActiveView("All")}>All Tasks</Button>
+    <Button variant="mobile-create" label="New entry" icon="plus" onClick={() => openNew(selectedDate)} />
     </nav>
 
     {editorOpen && (
@@ -415,10 +393,10 @@ function WeekView({
     <div className="page-title">{rangeLabel}</div>
     <div className="page-subtitle">Tasks scheduled for this week.</div>
     </div>
-    <div className="export-actions" style={{ display: "flex", gap: "8px" }}>
-    <Button variant="secondary" onClick={() => onWeekOffsetChange(weekOffset - 1)}>← Prev Week</Button>
+    <div className="export-actions" style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+    <Button variant="secondary" onClick={() => onWeekOffsetChange(weekOffset - 1)}>← Prev</Button>
     <Button variant="secondary" onClick={() => onWeekOffsetChange(0)}>This Week</Button>
-    <Button variant="secondary" onClick={() => onWeekOffsetChange(weekOffset + 1)}>Next Week →</Button>
+    <Button variant="secondary" onClick={() => onWeekOffsetChange(weekOffset + 1)}>Next →</Button>
     <Button variant="secondary" icon="download" onClick={onExportJson}>JSON</Button>
     <Button variant="primary" icon="calendar" onClick={onExportIcs}>.ics</Button>
     </div>
@@ -492,11 +470,9 @@ function MonthCalendarView({
 
   const calendarGrid = useMemo(() => {
     const grid = [];
-    // Blank days before start
     for (let i = 0; i < startingDayOfWeek; i++) {
       grid.push(null);
     }
-    // Days of month
     for (let d = 1; d <= daysInMonth; d++) {
       const dateObj = new Date(year, month, d);
       const dateStr = getTodayString(dateObj);
@@ -519,16 +495,16 @@ function MonthCalendarView({
     <div className="page-title">{monthLabel}</div>
     <div className="page-subtitle">Navigate through months to inspect planned activities.</div>
     </div>
-    <div style={{ display: "flex", gap: "8px" }}>
-    <Button variant="secondary" onClick={() => changeMonth(-1)}>← Prev Month</Button>
-    <Button variant="secondary" onClick={() => onMonthChange(new Date())}>Current Month</Button>
-    <Button variant="secondary" onClick={() => changeMonth(1)}>Next Month →</Button>
+    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+    <Button variant="secondary" onClick={() => changeMonth(-1)}>← Prev</Button>
+    <Button variant="secondary" onClick={() => onMonthChange(new Date())}>Current</Button>
+    <Button variant="secondary" onClick={() => changeMonth(1)}>Next →</Button>
     </div>
     </section>
 
-    <section style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "8px", marginTop: "16px" }}>
+    <section style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "4px", marginTop: "16px", overflowX: "auto" }}>
     {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((dayName) => (
-      <div key={dayName} style={{ fontWeight: "bold", textAlign: "center", padding: "8px", opacity: 0.7 }}>
+      <div key={dayName} style={{ fontWeight: "bold", textAlign: "center", padding: "4px", opacity: 0.7, fontSize: "12px" }}>
       {dayName}
       </div>
     ))}
@@ -540,18 +516,18 @@ function MonthCalendarView({
         style={{
           border: "1px solid var(--border-color, #334155)",
               borderRadius: "8px",
-              padding: "8px",
-              minHeight: "85px",
+              padding: "4px",
+              minHeight: "65px",
               backgroundColor: cell.isToday ? "rgba(59, 130, 246, 0.1)" : "transparent",
               cursor: "pointer",
               display: "flex",
               flexDirection: "column",
-              justifyContent: "space-between",
+              justify: "space-between",
         }}
         onClick={() => onSelectDate(cell.dateStr)}
         >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <strong style={{ color: cell.isToday ? "#3b82f6" : "inherit" }}>{cell.dayNum}</strong>
+        <strong style={{ color: cell.isToday ? "#3b82f6" : "inherit", fontSize: "13px" }}>{cell.dayNum}</strong>
         <Button
         variant="icon"
         icon="plus"
@@ -564,14 +540,14 @@ function MonthCalendarView({
         </div>
         <div>
         {cell.tasks.length > 0 && (
-          <div style={{ fontSize: "11px", marginTop: "4px" }}>
+          <div style={{ fontSize: "10px", marginTop: "2px" }}>
           <span style={{ fontWeight: "bold", color: "#3b82f6" }}>{cell.tasks.length} task(s)</span>
           </div>
         )}
         </div>
         </div>
       ) : (
-        <div key={`empty-${index}`} style={{ padding: "8px" }} />
+        <div key={`empty-${index}`} style={{ padding: "4px" }} />
       )
     )}
     </section>
@@ -670,7 +646,7 @@ function EntryEditor({
     </div>
     <TextArea
     label="Notes"
-    value={form.notes}
+    value={form.notes ?? ""}
     placeholder="Additional details..."
     onChange={(event) => update("notes", event.target.value)}
     />
