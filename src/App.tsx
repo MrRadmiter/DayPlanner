@@ -16,68 +16,38 @@ type Entry = {
   done: boolean;
 };
 
-const INITIAL_ENTRIES: Entry[] = [
-  {
-    id: 1,
-    title: "Lecture — ICT",
-    date: "2026-09-16",
-    start: "09:00",
-    end: "10:30",
-    category: "Study",
-    priority: "Medium",
-    notes: "Room 204",
-    done: true,
-  },
-{
-  id: 2,
-  title: "Team meeting",
-  date: "2026-09-16",
-  start: "11:30",
-  end: "12:15",
-  category: "Personal",
-  priority: "Low",
-  done: true,
-},
-{
-  id: 3,
-  title: "Gym session",
-  date: "2026-09-16",
-  start: "14:00",
-  end: "15:00",
-  category: "Health",
-  priority: "Medium",
-  done: false,
-},
-{
-  id: 4,
-  title: "Assignment 1 draft",
-  date: "2026-09-16",
-  start: "16:00",
-  end: "18:00",
-  category: "Study",
-  priority: "High",
-  notes: "Finish architecture slide",
-  done: false,
-},
-{
-  id: 5,
-  title: "Read 20 pages",
-  date: "2026-09-16",
-  start: "19:00",
-  category: "Study",
-  priority: "Low",
-  done: false,
-},
-];
-
 const categories: Array<"All" | Category> = ["All", "Study", "Personal", "Health"];
 
-function loadEntries() {
+const getTodayString = (dateObj = new Date()) => {
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const day = String(dateObj.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const formatFullDate = (dateStr: string) => {
+  const date = new Date(`${dateStr}T00:00:00`);
+  return date.toLocaleDateString("en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+};
+
+const getStartOfWeek = (d: Date) => {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(date.setDate(diff));
+};
+
+function loadEntries(): Entry[] {
   try {
     const value = localStorage.getItem("daymark.entries");
-    return value ? (JSON.parse(value) as Entry[]) : INITIAL_ENTRIES;
+    return value ? (JSON.parse(value) as Entry[]) : [];
   } catch {
-    return INITIAL_ENTRIES;
+    return [];
   }
 }
 
@@ -99,6 +69,8 @@ export default function App() {
   const [editing, setEditing] = useState<Entry | null>(null);
   const [dark, setDark] = useState(() => localStorage.getItem("daymark.theme") === "dark");
 
+  const todayStr = useMemo(() => getTodayString(), []);
+
   useEffect(() => {
     localStorage.setItem("daymark.entries", JSON.stringify(entries));
   }, [entries]);
@@ -108,17 +80,20 @@ export default function App() {
     localStorage.setItem("daymark.theme", dark ? "dark" : "light");
   }, [dark]);
 
+  const todayEntries = useMemo(
+    () => entries.filter((entry) => entry.date === todayStr),
+                               [entries, todayStr]
+  );
+
   const filtered = useMemo(
     () =>
-    entries
-    .filter((entry) => entry.date === "2026-09-16")
+    todayEntries
     .filter((entry) => category === "All" || entry.category === category)
     .filter((entry) => entry.title.toLowerCase().includes(query.toLowerCase()))
     .sort((a, b) => a.start.localeCompare(b.start)),
-                           [entries, category, query],
+                           [todayEntries, category, query]
   );
 
-  const todayEntries = entries.filter((entry) => entry.date === "2026-09-16");
   const completed = todayEntries.filter((entry) => entry.done).length;
   const percent = todayEntries.length ? Math.round((completed / todayEntries.length) * 100) : 0;
 
@@ -143,10 +118,10 @@ export default function App() {
     const events = entries
     .map(
       (entry) =>
-      `BEGIN:VEVENT\nUID:${entry.id}@daymark.local\nDTSTART:${entry.date.replaceAll("-", "")}T${entry.start.replace(":", "")}00\nSUMMARY:${entry.title}\nEND:VEVENT`,
+      `BEGIN:VEVENT\nUID:${entry.id}@daymark.local\nDTSTART:${entry.date.replaceAll("-", "")}T${entry.start.replace(":", "")}00\nSUMMARY:${entry.title}\nEND:VEVENT`
     )
     .join("\n");
-    downloadFile("daymark-week.ics", `BEGIN:VCALENDAR\nVERSION:2.0\n${events}\nEND:VCALENDAR`, "text/calendar");
+    downloadFile("daymark-schedule.ics", `BEGIN:VCALENDAR\nVERSION:2.0\n${events}\nEND:VCALENDAR`, "text/calendar");
   };
 
   return (
@@ -178,8 +153,8 @@ export default function App() {
     <div className="privacy-card">
     <div className="privacy-icon"><Icon name="shield" /></div>
     <div>
-    <div className="privacy-title">Private by design</div>
-    <div className="privacy-copy">Your plans stay in this browser.</div>
+    <div className="privacy-title">Local storage mode</div>
+    <div className="privacy-copy">Data is stored exclusively in this browser.</div>
     </div>
     </div>
     <Button variant="nav" onClick={() => setDark((value) => !value)} icon={dark ? "sun" : "moon"}>
@@ -202,8 +177,8 @@ export default function App() {
       <section className="page-heading">
       <div>
       <div className="eyebrow">TODAY</div>
-      <div className="page-title">Wednesday, 16 September</div>
-      <div className="page-subtitle">A calm day starts with a clear plan.</div>
+      <div className="page-title">{formatFullDate(todayStr)}</div>
+      <div className="page-subtitle">Daily task schedule and overview.</div>
       </div>
       <Button variant="primary" onClick={openNew} icon="plus">New entry</Button>
       </section>
@@ -227,7 +202,7 @@ export default function App() {
       <Field
       className="search-field"
       aria-label="Search entries"
-      placeholder="Search your day"
+      placeholder="Filter tasks..."
       value={query}
       onChange={(event) => setQuery(event.target.value)}
       leadingIcon="search"
@@ -259,7 +234,7 @@ export default function App() {
           icon="check"
           onClick={() =>
             setEntries((current) =>
-            current.map((item) => item.id === entry.id ? { ...item, done: !item.done } : item),
+            current.map((item) => (item.id === entry.id ? { ...item, done: !item.done } : item))
             )
           }
           />
@@ -283,8 +258,8 @@ export default function App() {
       ) : (
         <div className="empty-state">
         <div className="empty-icon"><Icon name="search" /></div>
-        <div className="empty-title">No matching entries</div>
-        <div className="empty-copy">Try a different search or category.</div>
+        <div className="empty-title">No entries found</div>
+        <div className="empty-copy">No tasks match the current filter or date.</div>
         </div>
       )}
       </section>
@@ -303,6 +278,7 @@ export default function App() {
     {editorOpen && (
       <EntryEditor
       entry={editing}
+      todayStr={todayStr}
       onClose={() => setEditorOpen(false)}
       onSave={saveEntry}
       onDelete={
@@ -328,58 +304,90 @@ function WeekView({
   onExportJson: () => void;
   onExportIcs: () => void;
 }) {
-  const days = [
-    { name: "Mon", date: "14", count: 3 },
-    { name: "Tue", date: "15", count: 2 },
-    { name: "Wed", date: "16", count: entries.filter((entry) => entry.date === "2026-09-16").length },
-    { name: "Thu", date: "17", count: 4 },
-    { name: "Fri", date: "18", count: 3 },
-    { name: "Sat", date: "19", count: 2 },
-    { name: "Sun", date: "20", count: 1 },
-  ];
+  const today = useMemo(() => new Date(), []);
+  const monday = useMemo(() => getStartOfWeek(today), [today]);
+
+  const weekDays = useMemo(() => {
+    const days = [];
+    const names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dateStr = getTodayString(d);
+      const dayEntries = entries.filter((e) => e.date === dateStr);
+      days.push({
+        name: names[i],
+        dateNum: d.getDate(),
+                fullDateStr: dateStr,
+                total: dayEntries.length,
+                completed: dayEntries.filter((e) => e.done).length,
+                isToday: dateStr === getTodayString(today),
+      });
+    }
+    return days;
+  }, [entries, monday, today]);
+
+  const totalWeekly = useMemo(() => weekDays.reduce((acc, d) => acc + d.total, 0), [weekDays]);
+  const completedWeekly = useMemo(() => weekDays.reduce((acc, d) => acc + d.completed, 0), [weekDays]);
+  const weeklyPercent = totalWeekly ? Math.round((completedWeekly / totalWeekly) * 100) : 0;
+
+  const maxDailyTasks = useMemo(() => Math.max(...weekDays.map((d) => d.total), 1), [weekDays]);
+
+  const sunday = useMemo(() => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + 6);
+    return d;
+  }, [monday]);
+
+  const rangeLabel = `${monday.getDate()}–${sunday.getDate()} ${sunday.toLocaleDateString("en-US", { month: "short" })}`;
 
   return (
     <>
     <section className="page-heading">
     <div>
-    <div className="eyebrow">WEEK 38</div>
-    <div className="page-title">14–20 September</div>
-    <div className="page-subtitle">Your week at a glance.</div>
+    <div className="eyebrow">WEEKLY OVERVIEW</div>
+    <div className="page-title">{rangeLabel}</div>
+    <div className="page-subtitle">Summary of tasks for the current week.</div>
     </div>
     <div className="export-actions">
     <Button variant="secondary" icon="download" onClick={onExportJson}>Export JSON</Button>
     <Button variant="primary" icon="calendar" onClick={onExportIcs}>Export .ics</Button>
     </div>
     </section>
+
     <section className="week-summary">
     <div>
     <div className="card-label">WEEKLY LOAD</div>
-    <div className="summary-number">20</div>
-    <div className="summary-caption">planned entries</div>
+    <div className="summary-number">{totalWeekly}</div>
+    <div className="summary-caption">total tasks</div>
     </div>
     <div className="summary-divider" />
     <div>
     <div className="card-label">COMPLETED</div>
-    <div className="summary-number">14</div>
-    <div className="summary-caption">70% of your week</div>
+    <div className="summary-number">{completedWeekly}</div>
+    <div className="summary-caption">{weeklyPercent}% completion rate</div>
     </div>
     <div className="week-bars">
-    {days.map((day) => (
+    {weekDays.map((day) => (
       <div className="day-column" key={day.name}>
       <div className="bar-track">
-      <div className="bar-fill" style={{ height: `${day.count * 16}%` }} />
+      <div
+      className="bar-fill"
+      style={{ height: `${(day.total / maxDailyTasks) * 100}%` }}
+      />
       </div>
       <span>{day.name}</span>
-      <strong className={day.name === "Wed" ? "today-date" : ""}>{day.date}</strong>
+      <strong className={day.isToday ? "today-date" : ""}>{day.dateNum}</strong>
       </div>
     ))}
     </div>
     </section>
+
     <section className="week-notice">
     <Icon name="shield" />
     <div>
-    <div className="privacy-title">Stored locally, always</div>
-    <div className="privacy-copy">Nothing is uploaded. Export a backup whenever you need one.</div>
+    <div className="privacy-title">Local Data Control</div>
+    <div className="privacy-copy">Data resides locally in the browser storage.</div>
     </div>
     </section>
     </>
@@ -388,11 +396,13 @@ function WeekView({
 
 function EntryEditor({
   entry,
+  todayStr,
   onClose,
   onSave,
   onDelete,
 }: {
   entry: Entry | null;
+  todayStr: string;
   onClose: () => void;
   onSave: (entry: Entry) => void;
   onDelete?: () => void;
@@ -401,30 +411,43 @@ function EntryEditor({
     entry ?? {
       id: Date.now(),
                                           title: "",
-                                          date: "2026-09-16",
+                                          date: todayStr,
                                           start: "09:00",
                                           end: "10:00",
                                           category: "Study",
                                           priority: "Medium",
                                           notes: "",
                                           done: false,
-    },
+    }
   );
 
-  const update = <K extends keyof Entry>(key: K, value: Entry[K]) => setForm((current) => ({ ...current, [key]: value }));
+  const update = <K extends keyof Entry>(key: K, value: Entry[K]) =>
+  setForm((current) => ({ ...current, [key]: value }));
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
-    <section className="modal" role="dialog" aria-modal="true" aria-label={entry ? "Edit entry" : "New entry"} onMouseDown={(event) => event.stopPropagation()}>
+    <section
+    className="modal"
+    role="dialog"
+    aria-modal="true"
+    aria-label={entry ? "Edit entry" : "New entry"}
+    onMouseDown={(event) => event.stopPropagation()}
+    >
     <div className="modal-header">
     <div>
     <div className="eyebrow">{entry ? "EDIT ENTRY" : "NEW ENTRY"}</div>
-    <div className="modal-title">{entry ? "Update your plan" : "Plan something meaningful"}</div>
+    <div className="modal-title">{entry ? "Edit task details" : "Create new task"}</div>
     </div>
     <Button variant="icon" label="Close" icon="close" onClick={onClose} />
     </div>
     <div className="form-stack">
-    <Field label="Title" value={form.title} placeholder="What are you planning?" autoFocus onChange={(event) => update("title", event.target.value)} />
+    <Field
+    label="Title"
+    value={form.title}
+    placeholder="Task title..."
+    autoFocus
+    onChange={(event) => update("title", event.target.value)}
+    />
     <div className="form-grid">
     <Field label="Date" type="date" value={form.date} onChange={(event) => update("date", event.target.value)} />
     <Field label="Start time" type="time" value={form.start} onChange={(event) => update("start", event.target.value)} />
@@ -435,7 +458,13 @@ function EntryEditor({
     <div className="field-label">Category</div>
     <div className="segmented">
     {(["Study", "Personal", "Health"] as Category[]).map((item) => (
-      <Button key={item} variant={form.category === item ? "segment-active" : "segment"} onClick={() => update("category", item)}>{item}</Button>
+      <Button
+      key={item}
+      variant={form.category === item ? "segment-active" : "segment"}
+      onClick={() => update("category", item)}
+      >
+      {item}
+      </Button>
     ))}
     </div>
     </div>
@@ -443,12 +472,23 @@ function EntryEditor({
     <div className="field-label">Priority</div>
     <div className="segmented">
     {(["High", "Medium", "Low"] as Priority[]).map((item) => (
-      <Button key={item} variant={form.priority === item ? "segment-active" : "segment"} onClick={() => update("priority", item)}>{item}</Button>
+      <Button
+      key={item}
+      variant={form.priority === item ? "segment-active" : "segment"}
+      onClick={() => update("priority", item)}
+      >
+      {item}
+      </Button>
     ))}
     </div>
     </div>
     </div>
-    <TextArea label="Notes" value={form.notes} placeholder="Add a helpful detail" onChange={(event) => update("notes", event.target.value)} />
+    <TextArea
+    label="Notes"
+    value={form.notes}
+    placeholder="Additional details..."
+    onChange={(event) => update("notes", event.target.value)}
+    />
     </div>
     <div className="modal-footer">
     {onDelete ? <Button variant="danger" icon="trash" onClick={onDelete}>Delete</Button> : <span />}
