@@ -522,7 +522,7 @@ function MonthCalendarView({
               cursor: "pointer",
               display: "flex",
               flexDirection: "column",
-              justify: "space-between",
+              justifyContent: "space-between",
         }}
         onClick={() => onSelectDate(cell.dateStr)}
         >
