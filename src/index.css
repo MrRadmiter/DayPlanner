@@ -339,3 +339,22 @@ textarea { min-height: 88px; resize: vertical; }
     font-size: 9px !important;
   }
 }
+
+/* Исправление отображения модального окна поверх мобильной панели */
+.modal-backdrop {
+  z-index: 2000 !important;
+  background: color-mix(in srgb, #0d1710 70%, transparent) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+
+@media (max-width: 680px) {
+  .modal-backdrop {
+    padding-bottom: 0 !important;
+  }
+
+  .modal {
+    position: relative !important;
+    z-index: 2001 !important;
+  }
+}
